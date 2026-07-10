@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>IR Kumanda</title>
+<style>
+  :root {
+    --bg: #14161A;
+    --panel: #1E2125;
+    --panel-raised: #24272C;
+    --border: #2C2F35;
+    --text: #F2F3F5;
+    --text-muted: #888E96;
+    --text-faint: #55595F;
+
+    --tv: #5B9BD5;
+    --tv-dim: #3A5E78;
+    --ac: #45C4B0;
+    --ac-dim: #2C6B61;
+
+    --ir-glow: #C77DFF;
+    --danger: #E5484D;
+
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 18px 14px calc(18px + env(safe-area-inset-bottom));
+  }
+
+  .device {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* ---------- Header ---------- */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 4px 4px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+
+  .brand-dot {
+    position: relative;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--ir-glow);
+    box-shadow: 0 0 6px var(--ir-glow);
+    flex-shrink: 0;
+  }
+
+  .brand-dot::before,
+  .brand-dot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid var(--ir-glow);
+    opacity: 0;
+  }
+
+  .brand-dot.pulse::before { animation: irring 0.7s ease-out; }
+  .brand-dot.pulse::after { animation: irring 0.7s ease-out 0.12s; }
+
+  @keyframes irring {
+    0%   { transform: scale(1);   opacity: 0.9; }
+    100% { transform: scale(6.5); opacity: 0; }
+  }
+
+  .brand-text {
+    font-size: 12.5px;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .conn-badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .conn-badge .led {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ac);
+    box-shadow: 0 0 5px var(--ac);
+  }
+
+  /* ---------- Segmented control ---------- */
+  .segment {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 4px;
+    position: relative;
+  }
+
+  .segment button {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 14px;
+    padding: 11px 0;
+    border-radius: 10px;
+    letter-spacing: 0.02em;
+    transition: color 0.2s ease;
+    position: relative;
+    z-index: 1;
+  }
+
+  .segment-thumb {
+    position: absolute;
+    top: 4px; left: 4px;
+    width: calc(50% - 4px);
+    height: calc(100% - 8px);
+    background: var(--panel-raised);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+  }
+  .segment.on-ac .segment-thumb { transform: translateX(100%); }
+
+  .segment button.active.tv-label { color: var(--tv); }
+  .segment button.active.ac-label { color: var(--ac); }
+
+  /* ---------- Status readout ---------- */
+  .readout {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .readout-main {
+    font-family: var(--font-mono);
+    font-size: 34px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    line-height: 1;
+  }
+
+  .readout-main .unit { font-size: 17px; color: var(--text-muted); margin-left: 2px; }
+
+  .readout-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .readout-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--panel-raised);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .readout-icon svg { width: 20px; height: 20px; }
+
+  /* ---------- Panels (tv/ac views) ---------- */
+  .panel-view { display: none; flex-direction: column; gap: 12px; }
+  .panel-view.active { display: flex; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px;
+  }
+
+  .card-label {
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin: 2px 4px 10px;
+  }
+
+  /* ---------- Generic tactile button ---------- */
+  .btn {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--panel-raised);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 16px 10px;
+    font-family: var(--font-ui);
+    font-size: 13.5px;
+    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn svg { width: 20px; height: 20px; }
+
+  .btn:active {
+    transform: scale(0.94);
+    background: var(--panel);
+  }
+
+  .btn.tv-accent:active { border-color: var(--tv); color: var(--tv); }
+  .btn.ac-accent:active { border-color: var(--ac); color: var(--ac); }
+
+  .btn-flash {
+    position: absolute;
+    inset: 0;
+    background: var(--ir-glow);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .btn-flash.go { animation: flash 0.45s ease-out; }
+  @keyframes flash {
+    0% { opacity: 0.35; }
+    100% { opacity: 0; }
+  }
+
+  /* volume/channel rocker grid */
+  .rocker-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .rocker {
+    display: flex;
+    flex-direction: column;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .rocker .btn {
+    border: none;
+    border-radius: 0;
+    padding: 20px 0;
+  }
+  .rocker .btn:first-child { border-bottom: 1px solid var(--border); }
+  .rocker-caption {
+    text-align: center;
+    font-size: 10.5px;
+    color: var(--text-faint);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 7px;
+  }
+
+  .row3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+
+  .row2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  /* mute / mode toggle chip look */
+  .btn.chip {
+    padding: 13px 10px;
+    flex-direction: row;
+    font-size: 12.5px;
+  }
+
+  /* ---------- Temp stepper (AC) ---------- */
+  .temp-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    padding: 6px 0 4px;
+  }
+  .temp-btn {
+    width: 54px; height: 54px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--panel-raised);
+    color: var(--ac);
+    font-size: 24px;
+    font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+  }
+  .temp-btn:active { transform: scale(0.92); background: var(--panel); }
+  .temp-value {
+    font-family: var(--font-mono);
+    font-size: 42px;
+    font-weight: 500;
+    min-width: 100px;
+    text-align: center;
+  }
+  .temp-value .deg { font-size: 20px; color: var(--text-muted); }
+
+  /* ---------- Power button ---------- */
+  .power-bar {
+    display: flex;
+    justify-content: center;
+    padding-top: 4px;
+  }
+  .power-btn {
+    width: 100%;
+    max-width: 420px;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid #3A2426;
+    background: linear-gradient(180deg, #2A1618, #1F1416);
+    color: var(--danger);
+    font-family: var(--font-ui);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+  }
+  .power-btn:active { transform: scale(0.98); background: #1a0f10; }
+  .power-btn svg { width: 18px; height: 18px; }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--panel-raised);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 12.5px;
+    padding: 9px 16px;
+    border-radius: 999px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    font-family: var(--font-mono);
+    letter-spacing: 0.02em;
+    z-index: 50;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<div class="device">
+
+  <div class="header">
+    <div class="brand">
+      <span class="brand-dot" id="irDot"></span>
+      <span class="brand-text">IR Remote · ESP8266</span>
+    </div>
+    <div class="conn-badge"><span class="led"></span>AP</div>
+  </div>
+
+  <div class="segment" id="segment">
+    <div class="segment-thumb"></div>
+    <button class="tv-label active" data-target="tv" onclick="switchDevice('tv')">TV</button>
+    <button class="ac-label" data-target="ac" onclick="switchDevice('ac')">Klima</button>
+  </div>
+
+  <div class="readout">
+    <div>
+      <div class="readout-main" id="readoutMain">— <span class="unit" id="readoutUnit"></span></div>
+      <div class="readout-sub" id="readoutSub">Son komut yok</div>
+    </div>
+    <div class="readout-icon" id="readoutIcon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#5B9BD5" stroke-width="1.8"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M8 21h8" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+
+  <!-- ===================== TV PANEL ===================== -->
+  <div class="panel-view active" id="panel-tv">
+
+    <div class="card">
+      <div class="card-label">Ses / Kanal</div>
+      <div class="rocker-grid">
+        <div>
+          <div class="rocker">
+            <button class="btn tv-accent" onclick="sendCmd('tv','vol_up',this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <button class="btn tv-accent" onclick="sendCmd('tv','vol_down',this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 12h14"/></svg>
+            </button>
+          </div>
+          <div class="rocker-caption">Ses</div>
+        </div>
+        <div>
+          <div class="rocker">
+            <button class="btn tv-accent" onclick="sendCmd('tv','ch_up',this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <button class="btn tv-accent" onclick="sendCmd('tv','ch_down',this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 12h14"/></svg>
+            </button>
+          </div>
+          <div class="rocker-caption">Kanal</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Hızlı Erişim</div>
+      <div class="row3">
+        <button class="btn tv-accent chip" onclick="sendCmd('tv','mute',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4V5zM16 9l5 6M21 9l-5 6"/></svg>
+          Sessiz
+        </button>
+        <button class="btn tv-accent chip" onclick="sendCmd('tv','source',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h10M4 17h7"/></svg>
+          Kaynak
+        </button>
+        <button class="btn tv-accent chip" onclick="sendCmd('tv','menu',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          Menü
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===================== AC PANEL ===================== -->
+  <div class="panel-view" id="panel-ac">
+
+    <div class="card">
+      <div class="card-label">Sıcaklık</div>
+      <div class="temp-stepper">
+        <button class="temp-btn" onclick="tempStep(-1,this)">−</button>
+        <div class="temp-value" id="tempValue">24<span class="deg">°C</span></div>
+        <button class="temp-btn" onclick="tempStep(1,this)">+</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Mod</div>
+      <div class="row3">
+        <button class="btn ac-accent chip mode-btn active-mode" data-mode="cool" onclick="setMode('cool',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2v20M4.9 4.9l14.2 14.2M19.1 4.9 4.9 19.1"/></svg>
+          Soğutma
+        </button>
+        <button class="btn ac-accent chip mode-btn" data-mode="fan" onclick="setMode('fan',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="2.3"/><path d="M12 9.7c0-3 2-5 4.3-4.6 1.7.3 2.4 2.6.9 4M14.3 12c3 0 5 2 4.6 4.3-.3 1.7-2.6 2.4-4 .9M9.7 12c-3 0-5-2-4.6-4.3.3-1.7 2.6-2.4 4-.9"/></svg>
+          Fan
+        </button>
+        <button class="btn ac-accent chip mode-btn" data-mode="auto" onclick="setMode('auto',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14.5-4.6M20 12a8 8 0 0 1-14.5 4.6M17 4v4h-4M7 20v-4h4"/></svg>
+          Auto
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Fan Hızı</div>
+      <div class="row3">
+        <button class="btn ac-accent chip fan-btn active-fan" data-fan="low" onclick="setFan('low',this)">Düşük</button>
+        <button class="btn ac-accent chip fan-btn" data-fan="med" onclick="setFan('med',this)">Orta</button>
+        <button class="btn ac-accent chip fan-btn" data-fan="high" onclick="setFan('high',this)">Yüksek</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="power-bar">
+    <button class="power-btn" id="powerBtn" onclick="sendPower(this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v9"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
+      GÜÇ
+    </button>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  /* =========================================================================
+     ESP8266 tarafında beklenen endpoint:
+       GET /ir?dev=tv&cmd=vol_up
+       GET /ir?dev=ac&cmd=power
+       GET /ir?dev=ac&cmd=temp&val=24
+       GET /ir?dev=ac&cmd=mode&val=cool
+       GET /ir?dev=ac&cmd=fan&val=low
+     Sunucu tarafında bu parametreleri okuyup ilgili sendNEC()/sendLG()
+     çağrısını yapman yeterli. Ağ isteği başarısız olsa bile arayüz
+     bozulmaz, sadece toast ile hata gösterir.
+     ========================================================================= */
+
+  let currentDevice = 'tv';
+  let acTemp = 24;
+  let acMode = 'cool';
+  let acFan = 'low';
+  let acOn = false;
+  let tvOn = false;
+
+  const segment = document.getElementById('segment');
+  const readoutMain = document.getElementById('readoutMain');
+  const readoutUnit = document.getElementById('readoutUnit');
+  const readoutSub = document.getElementById('readoutSub');
+  const readoutIcon = document.getElementById('readoutIcon');
+  const toastEl = document.getElementById('toast');
+  const irDot = document.getElementById('irDot');
+
+  function switchDevice(dev) {
+    currentDevice = dev;
+    segment.classList.toggle('on-ac', dev === 'ac');
+    document.querySelectorAll('.segment button').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.segment button[data-target="${dev}"]`).classList.add('active');
+
+    document.getElementById('panel-tv').classList.toggle('active', dev === 'tv');
+    document.getElementById('panel-ac').classList.toggle('active', dev === 'ac');
+
+    updateReadout();
+  }
+
+  function updateReadout() {
+    if (currentDevice === 'tv') {
+      readoutMain.innerHTML = tvOn ? 'ON' : '—';
+      readoutUnit.textContent = '';
+      readoutSub.textContent = tvOn ? 'TV açık' : 'TV kapalı';
+      readoutIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#5B9BD5" stroke-width="1.8"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M8 21h8" stroke-linecap="round"/></svg>';
+    } else {
+      readoutMain.innerHTML = acOn ? `${acTemp}<span class="unit">°C</span>` : '—';
+      readoutUnit.textContent = '';
+      readoutSub.textContent = acOn ? `Klima açık · ${modeLabel(acMode)} · ${fanLabel(acFan)}` : 'Klima kapalı';
+      readoutIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#45C4B0" stroke-width="1.8"><path d="M12 2v20M4.9 4.9l14.2 14.2M19.1 4.9 4.9 19.1"/></svg>';
+    }
+  }
+
+  function modeLabel(m) { return { cool: 'Soğutma', fan: 'Fan', auto: 'Auto' }[m]; }
+  function fanLabel(f) { return { low: 'Düşük', med: 'Orta', high: 'Yüksek' }[f]; }
+
+  function flashDot() {
+    irDot.classList.remove('pulse');
+    void irDot.offsetWidth; // reflow, reanimate
+    irDot.classList.add('pulse');
+  }
+
+  function flashBtn(el) {
+    if (!el) return;
+    let f = el.querySelector('.btn-flash');
+    if (!f) {
+      f = document.createElement('span');
+      f.className = 'btn-flash';
+      el.appendChild(f);
+    }
+    f.classList.remove('go');
+    void f.offsetWidth;
+    f.classList.add('go');
+  }
+
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toastEl.classList.remove('show'), 1400);
+  }
+
+  function sendIR(params, label) {
+    flashDot();
+    const qs = new URLSearchParams(params).toString();
+    fetch('/ir?' + qs)
+      .then(r => { if (!r.ok) throw new Error(); showToast(label + ' gönderildi'); })
+      .catch(() => showToast('Bağlantı hatası'));
+  }
+
+  function sendCmd(dev, cmd, el) {
+    flashBtn(el);
+    sendIR({ dev, cmd }, cmd);
+  }
+
+  function sendPower(el) {
+    flashBtn(el);
+    flashDot();
+    if (currentDevice === 'tv') { tvOn = !tvOn; } else { acOn = !acOn; }
+    updateReadout();
+    sendIR({ dev: currentDevice, cmd: 'power' }, 'Güç');
+  }
+
+  function tempStep(dir, el) {
+    acTemp = Math.min(30, Math.max(16, acTemp + dir));
+    document.getElementById('tempValue').innerHTML = `${acTemp}<span class="deg">°C</span>`;
+    flashBtn(el);
+    updateReadout();
+    sendIR({ dev: 'ac', cmd: 'temp', val: acTemp }, `${acTemp}°C`);
+  }
+
+  function setMode(mode, el) {
+    acMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active-mode'));
+    el.classList.add('active-mode');
+    flashBtn(el);
+    updateReadout();
+    sendIR({ dev: 'ac', cmd: 'mode', val: mode }, modeLabel(mode));
+  }
+
+  function setFan(fan, el) {
+    acFan = fan;
+    document.querySelectorAll('.fan-btn').forEach(b => b.classList.remove('active-fan'));
+    el.classList.add('active-fan');
+    flashBtn(el);
+    updateReadout();
+    sendIR({ dev: 'ac', cmd: 'fan', val: fan }, fanLabel(fan));
+  }
+
+  // stil: seçili mod/fan chip'i vurgula
+  const style = document.createElement('style');
+  style.textContent = `
+    .mode-btn.active-mode, .fan-btn.active-fan {
+      border-color: var(--ac);
+      color: var(--ac);
+      background: #17302c;
+    }
+  `;
+  document.head.appendChild(style);
+
+  updateReadout();
+</script>
+
+</body>
+</html>
