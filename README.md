@@ -32,6 +32,9 @@ ESP8266 kullanarak kızılötesi (IR) kumanda sinyallerini okuyup, bir IR LED de
 | Uygun GPIO | Transistör base (direnç üzerinden) |
 
 > Not: ESP8266 3.3V ile çalışır, ancak IR LED'in daha güçlü sinyal üretebilmesi için VIN pininden (Type-C üzerinden gelen) 5V kullanılmıştır.
+<img width="768" height="392" alt="resim" src="https://github.com/user-attachments/assets/d8d150e5-243c-442b-8d61-12b779840154" />
+<img width="768" height="426" alt="resim" src="https://github.com/user-attachments/assets/572a5429-4fa8-4a05-9611-7eee1d8341ee" />
+
 
 ## Kurulum
 
